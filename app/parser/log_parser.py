@@ -109,7 +109,10 @@ class LogParser:
                 error_message="Empty line"
             )
 
-        match = self.log_pattern.match(line)
+        # The complete line must match the documented format.  Using ``match``
+        # would silently accept a valid-looking prefix followed by unexpected
+        # data, which is especially undesirable when analysing security logs.
+        match = self.log_pattern.fullmatch(line)
 
         if not match:
             self.stats['failed'] += 1

@@ -211,14 +211,15 @@ class ThreatDetectionEngine:
 
         denied_df = self.df[self.df['action'] == 'DENY']
 
-        deny_counts = denied_df.groupby('source_ip').agg({
-            'id': 'count',
-            'destination_ip': 'nunique',
-            'destination_port': 'nunique',
-            'timestamp': ['min', 'max']
-        })
-
-        deny_counts.columns = ['deny_count', 'unique_destinations', 'unique_ports', 'first_seen', 'last_seen']
+        # Do not depend on a database-specific ``id`` column: the public
+        # constructor accepts ordinary parsed-log DataFrames as well.
+        deny_counts = denied_df.groupby('source_ip').agg(
+            deny_count=('action', 'size'),
+            unique_destinations=('destination_ip', 'nunique'),
+            unique_ports=('destination_port', 'nunique'),
+            first_seen=('timestamp', 'min'),
+            last_seen=('timestamp', 'max')
+        )
 
         suspicious = deny_counts[deny_counts['deny_count'] >= min_denies]
 

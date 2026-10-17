@@ -48,6 +48,15 @@ def test_log_parser_invalid_ip():
     assert parsed.is_valid is False
 
 
+def test_log_parser_rejects_trailing_content():
+    parser = LogParser()
+    line = "2024-10-01 09:00:01 203.0.113.5:45123 -> 10.0.1.15:443 TCP ALLOW extra"
+
+    parsed = parser.parse_line(line)
+
+    assert parsed.is_valid is False
+
+
 # Database Tests
 def test_database_manager(tmp_path):
     db_file = tmp_path / "test.db"
@@ -96,6 +105,10 @@ def test_threat_detection():
     assert len(alerts) > 0
     assert alerts[0].alert_type == "Port Scanning"
     assert alerts[0].source_ip == "198.51.100.1"
+
+    # The documented input contract does not require a database-generated id.
+    # Running all rules must therefore work with this DataFrame.
+    assert isinstance(detector.run_all_detections(), list)
 
 
 # ML Pipeline Tests

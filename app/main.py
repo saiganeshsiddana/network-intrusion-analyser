@@ -32,7 +32,9 @@ st.set_page_config(
 if 'db' not in st.session_state:
     st.session_state.db = DatabaseManager()
 if 'logs_loaded' not in st.session_state:
-    st.session_state.logs_loaded = False
+    # The database persists across browser refreshes while Streamlit session
+    # state does not.  Derive this status from the durable source of truth.
+    st.session_state.logs_loaded = st.session_state.db.get_event_count() > 0
 if 'current_df' not in st.session_state:
     st.session_state.current_df = pd.DataFrame()
 if 'alerts' not in st.session_state:
@@ -41,6 +43,61 @@ if 'incidents' not in st.session_state:
     st.session_state.incidents = []
 if 'ml_results' not in st.session_state:
     st.session_state.ml_results = pd.DataFrame()
+
+
+def _store_alerts(db, alerts):
+    """Persist alerts when restoring an analysis after a session reset."""
+    for alert in alerts:
+        db.insert_alert({
+            'alert_type': alert.alert_type,
+            'source_ip': alert.source_ip,
+            'destination_ip': alert.destination_ip,
+            'destination_port': alert.destination_port,
+            'severity': alert.severity,
+            'risk_score': alert.risk_score,
+            'event_count': alert.event_count,
+            'first_seen': alert.first_seen.strftime('%Y-%m-%d %H:%M:%S'),
+            'last_seen': alert.last_seen.strftime('%Y-%m-%d %H:%M:%S'),
+            'explanation': alert.explanation,
+            'recommendation': alert.recommendation,
+        })
+
+
+def _store_incidents(db, incidents):
+    """Persist correlated incidents when restoring an analysis."""
+    for incident in incidents:
+        db.insert_incident({
+            'incident_type': incident.incident_type,
+            'source_ip': incident.source_ip,
+            'destination_ip': incident.destination_ip,
+            'severity': incident.severity,
+            'risk_score': incident.risk_score,
+            'status': incident.status,
+            'first_seen': incident.first_seen.strftime('%Y-%m-%d %H:%M:%S'),
+            'last_seen': incident.last_seen.strftime('%Y-%m-%d %H:%M:%S'),
+            'event_count': incident.event_count,
+            'alert_count': incident.alert_count,
+            'summary': incident.summary,
+            'recommendation': incident.recommendation,
+        })
+
+
+# A browser refresh clears Streamlit's session state but does not clear SQLite.
+# Rebuild the derived results from saved events so every analysis page remains
+# available after a refresh or server restart.
+if st.session_state.logs_loaded and not st.session_state.alerts:
+    restored_df = st.session_state.db.get_logs_as_dataframe()
+    restored_alerts = ThreatDetectionEngine(restored_df).run_all_detections()
+    restored_incidents = IncidentCorrelator(restored_alerts, restored_df).correlate_incidents()
+
+    st.session_state.current_df = restored_df
+    st.session_state.alerts = restored_alerts
+    st.session_state.incidents = restored_incidents
+
+    if st.session_state.db.get_alerts().empty:
+        _store_alerts(st.session_state.db, restored_alerts)
+    if st.session_state.db.get_incidents().empty:
+        _store_incidents(st.session_state.db, restored_incidents)
 
 # Custom CSS
 st.markdown("""
@@ -58,32 +115,42 @@ st.markdown("""
         border-left: 4px solid #1f77b4;
     }
     .alert-critical {
-        background-color: #fee;
+        background-color: #ffe4e6;
         border-left: 4px solid #d32f2f;
         padding: 1rem;
         border-radius: 0.3rem;
         margin: 0.5rem 0;
+        color: #881337;
     }
     .alert-high {
-        background-color: #fff3e0;
+        background-color: #ffedd5;
         border-left: 4px solid #f57c00;
         padding: 1rem;
         border-radius: 0.3rem;
         margin: 0.5rem 0;
+        color: #9a3412;
     }
     .alert-medium {
-        background-color: #fff8e1;
+        background-color: #fef3c7;
         border-left: 4px solid #fbc02d;
         padding: 1rem;
         border-radius: 0.3rem;
         margin: 0.5rem 0;
+        color: #92400e;
     }
     .alert-low {
-        background-color: #f1f8e9;
+        background-color: #dcfce7;
         border-left: 4px solid #689f38;
         padding: 1rem;
         border-radius: 0.3rem;
         margin: 0.5rem 0;
+        color: #166534;
+    }
+    .alert-critical h3, .alert-critical p, .alert-critical strong,
+    .alert-high h3, .alert-high p, .alert-high strong,
+    .alert-medium h3, .alert-medium p, .alert-medium strong,
+    .alert-low h3, .alert-low p, .alert-low strong {
+        color: inherit !important;
     }
 </style>
 """, unsafe_allow_html=True)

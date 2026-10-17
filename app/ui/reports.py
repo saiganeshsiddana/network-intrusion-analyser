@@ -1,6 +1,7 @@
 """Reports UI Module."""
 
 import streamlit as st
+import pandas as pd
 from app.reporting.reports import ReportGenerator
 from app.analysis.analytics import NetworkAnalytics
 
@@ -29,10 +30,7 @@ def show(db):
             alerts_df = db.get_alerts()
             incidents_df = db.get_incidents()
 
-            try:
-                ml_results = st.session_state.get('ml_results', pd.DataFrame())
-            except:
-                ml_results = pd.DataFrame()
+            ml_results = st.session_state.get('ml_results', pd.DataFrame())
 
             report_path = reporter.generate_summary_report(stats, alerts_df, incidents_df, ml_results)
             st.success(f"Report generated: {report_path}")

@@ -15,6 +15,20 @@ def show(db, ml_results):
     In production, use real historical labeled attack data.
     """)
 
+    # ML results live in session state, so rebuild them from persisted events
+    # after a page/browser refresh.
+    predictor = None
+    if ml_results.empty:
+        df = db.get_logs_as_dataframe()
+        if not df.empty:
+            try:
+                predictor = ThreatPredictor()
+                ml_results = predictor.predict_source_ips(df)
+                st.session_state.ml_results = ml_results
+            except Exception as error:
+                st.error(f"Unable to run ML analysis: {error}")
+                return
+
     if ml_results.empty:
         st.info("No ML analysis available. Upload and analyze logs first.")
         return
@@ -54,8 +68,8 @@ def show(db, ml_results):
 
     # Feature importance
     st.subheader("📈 Feature Importance")
-    from app.ml.predict import ThreatPredictor
-    predictor = ThreatPredictor()
+    if predictor is None:
+        predictor = ThreatPredictor()
     feature_importance = predictor.get_feature_importance()
 
     if feature_importance:
