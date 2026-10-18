@@ -99,6 +99,22 @@ if st.session_state.logs_loaded and not st.session_state.alerts:
     if st.session_state.db.get_incidents().empty:
         _store_incidents(st.session_state.db, restored_incidents)
 
+# Persist and restore ML output in the same way as alerts and incidents.  This
+# keeps the ML page and reports useful after refreshing the browser.
+if st.session_state.logs_loaded and st.session_state.ml_results.empty:
+    persisted_ml_results = st.session_state.db.get_ml_predictions()
+    if persisted_ml_results.empty:
+        try:
+            ml_predictor = ThreatPredictor()
+            persisted_ml_results = ml_predictor.predict_and_store(
+                st.session_state.current_df,
+                st.session_state.db,
+            )
+        except Exception:
+            # The ML page presents an actionable error if a later retry fails.
+            persisted_ml_results = pd.DataFrame()
+    st.session_state.ml_results = persisted_ml_results
+
 # Custom CSS
 st.markdown("""
 <style>

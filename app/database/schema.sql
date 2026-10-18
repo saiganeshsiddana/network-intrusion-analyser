@@ -65,3 +65,24 @@ CREATE INDEX IF NOT EXISTS idx_incident_source_ip ON incidents(source_ip);
 CREATE INDEX IF NOT EXISTS idx_incident_severity ON incidents(severity);
 CREATE INDEX IF NOT EXISTS idx_incident_status ON incidents(status);
 CREATE INDEX IF NOT EXISTS idx_incident_risk_score ON incidents(risk_score);
+
+-- ML Predictions Table
+-- Stores the latest per-source classification so ML findings survive a
+-- Streamlit browser refresh and can be included in exported reports.
+CREATE TABLE IF NOT EXISTS ml_predictions (
+    source_ip TEXT PRIMARY KEY,
+    ml_prediction INTEGER NOT NULL CHECK (ml_prediction IN (0, 1)),
+    ml_threat_probability REAL NOT NULL,
+    ml_confidence REAL NOT NULL,
+    ml_label TEXT NOT NULL,
+    total_connections INTEGER NOT NULL,
+    denied_connections INTEGER NOT NULL,
+    unique_dst_ports INTEGER NOT NULL,
+    connections_per_minute REAL NOT NULL,
+    deny_ratio REAL NOT NULL,
+    port_scan_score REAL NOT NULL,
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ml_prediction_label ON ml_predictions(ml_label);
+CREATE INDEX IF NOT EXISTS idx_ml_prediction_probability ON ml_predictions(ml_threat_probability DESC);

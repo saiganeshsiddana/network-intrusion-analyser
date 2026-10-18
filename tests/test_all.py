@@ -83,6 +83,31 @@ def test_database_manager(tmp_path):
     assert db.get_event_count() == 1
 
 
+def test_ml_predictions_are_persisted(tmp_path):
+    db = DatabaseManager(str(tmp_path / "test_ml.db"))
+    predictions = pd.DataFrame([
+        {
+            'source_ip': '198.51.100.7',
+            'ml_prediction': 1,
+            'ml_threat_probability': 0.93,
+            'ml_confidence': 0.93,
+            'ml_label': 'Suspicious',
+            'total_connections': 120,
+            'denied_connections': 100,
+            'unique_dst_ports': 44,
+            'connections_per_minute': 24.0,
+            'deny_ratio': 0.83,
+            'port_scan_score': 0.88,
+        }
+    ])
+
+    assert db.replace_ml_predictions(predictions) == 1
+    stored = db.get_ml_predictions()
+    assert len(stored) == 1
+    assert stored.iloc[0]['source_ip'] == '198.51.100.7'
+    assert stored.iloc[0]['ml_label'] == 'Suspicious'
+
+
 # Detection Engine Tests
 def test_threat_detection():
     data = []

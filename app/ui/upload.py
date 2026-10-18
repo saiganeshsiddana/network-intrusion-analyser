@@ -114,7 +114,7 @@ def show(db):
                     # Run ML predictions
                     with st.spinner("Running ML analysis..."):
                         predictor = ThreatPredictor()
-                        ml_results = predictor.predict_source_ips(df)
+                        ml_results = predictor.predict_and_store(df, db)
                         st.session_state.ml_results = ml_results
                         st.success(f"ML analysis complete")
 
@@ -207,7 +207,7 @@ def show(db):
                                 })
 
                             predictor = ThreatPredictor()
-                            ml_results = predictor.predict_source_ips(df)
+                            ml_results = predictor.predict_and_store(df, db)
                             st.session_state.ml_results = ml_results
 
                         st.session_state.logs_loaded = True

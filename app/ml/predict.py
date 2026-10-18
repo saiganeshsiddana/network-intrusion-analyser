@@ -73,6 +73,12 @@ class ThreatPredictor:
         results = results.sort_values('ml_threat_probability', ascending=False)
         return results
 
+    def predict_and_store(self, df: pd.DataFrame, database) -> pd.DataFrame:
+        """Run inference and persist the current per-source ML findings."""
+        results = self.predict_source_ips(df)
+        database.replace_ml_predictions(results)
+        return results
+
     def get_feature_importance(self) -> Dict[str, float]:
         """Get feature importance dictionary."""
         if self.model is None or self.feature_names is None:

@@ -3,6 +3,7 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
+from app.ml.predict import ThreatPredictor
 
 
 def show(db, ml_results):
@@ -15,23 +16,35 @@ def show(db, ml_results):
     In production, use real historical labeled attack data.
     """)
 
-    # ML results live in session state, so rebuild them from persisted events
-    # after a page/browser refresh.
+    # ML results live in SQLite so they survive session resets.  If no result
+    # exists yet, run inference against the currently stored event dataset.
     predictor = None
     if ml_results.empty:
-        df = db.get_logs_as_dataframe()
-        if not df.empty:
-            try:
-                predictor = ThreatPredictor()
-                ml_results = predictor.predict_source_ips(df)
-                st.session_state.ml_results = ml_results
-            except Exception as error:
-                st.error(f"Unable to run ML analysis: {error}")
-                return
+        ml_results = db.get_ml_predictions()
+        if ml_results.empty:
+            df = db.get_logs_as_dataframe()
+            if not df.empty:
+                try:
+                    predictor = ThreatPredictor()
+                    ml_results = predictor.predict_and_store(df, db)
+                except Exception as error:
+                    st.error(f"Unable to run ML analysis: {error}")
+                    return
+        st.session_state.ml_results = ml_results
 
     if ml_results.empty:
         st.info("No ML analysis available. Upload and analyze logs first.")
         return
+
+    if st.button("Re-run ML Analysis"):
+        try:
+            predictor = ThreatPredictor()
+            ml_results = predictor.predict_and_store(db.get_logs_as_dataframe(), db)
+            st.session_state.ml_results = ml_results
+            st.success("ML analysis refreshed using the current log dataset.")
+        except Exception as error:
+            st.error(f"Unable to re-run ML analysis: {error}")
+            return
 
     # Model info
     st.subheader("📊 Model Information")

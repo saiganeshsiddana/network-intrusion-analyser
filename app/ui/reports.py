@@ -31,6 +31,8 @@ def show(db):
             incidents_df = db.get_incidents()
 
             ml_results = st.session_state.get('ml_results', pd.DataFrame())
+            if ml_results.empty:
+                ml_results = db.get_ml_predictions()
 
             report_path = reporter.generate_summary_report(stats, alerts_df, incidents_df, ml_results)
             st.success(f"Report generated: {report_path}")

@@ -78,6 +78,7 @@ class DatabaseManager:
             conn.execute("DELETE FROM network_events")
             conn.execute("DELETE FROM alerts")
             conn.execute("DELETE FROM incidents")
+            conn.execute("DELETE FROM ml_predictions")
             conn.commit()
 
     def get_event_count(self) -> int:
@@ -225,3 +226,51 @@ class DatabaseManager:
         with self.get_connection() as conn:
             conn.execute("DELETE FROM incidents")
             conn.commit()
+
+    def replace_ml_predictions(self, predictions: pd.DataFrame) -> int:
+        """Replace persisted ML results with predictions for the current logs."""
+        required_columns = {
+            'source_ip', 'ml_prediction', 'ml_threat_probability', 'ml_confidence',
+            'ml_label', 'total_connections', 'denied_connections', 'unique_dst_ports',
+            'connections_per_minute', 'deny_ratio', 'port_scan_score'
+        }
+        missing_columns = required_columns.difference(predictions.columns)
+        if missing_columns:
+            raise ValueError(f"ML prediction results missing columns: {sorted(missing_columns)}")
+
+        insert_sql = """
+        INSERT INTO ml_predictions
+        (source_ip, ml_prediction, ml_threat_probability, ml_confidence, ml_label,
+         total_connections, denied_connections, unique_dst_ports,
+         connections_per_minute, deny_ratio, port_scan_score)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        rows = [
+            (
+                row.source_ip,
+                int(row.ml_prediction),
+                float(row.ml_threat_probability),
+                float(row.ml_confidence),
+                row.ml_label,
+                int(row.total_connections),
+                int(row.denied_connections),
+                int(row.unique_dst_ports),
+                float(row.connections_per_minute),
+                float(row.deny_ratio),
+                float(row.port_scan_score),
+            )
+            for row in predictions[list(required_columns)].itertuples(index=False)
+        ]
+
+        with self.get_connection() as conn:
+            conn.execute("DELETE FROM ml_predictions")
+            if rows:
+                conn.executemany(insert_sql, rows)
+            conn.commit()
+        return len(rows)
+
+    def get_ml_predictions(self) -> pd.DataFrame:
+        """Fetch ML predictions ordered from highest to lowest risk."""
+        query = "SELECT * FROM ml_predictions ORDER BY ml_threat_probability DESC, source_ip"
+        with self.get_connection() as conn:
+            return pd.read_sql_query(query, conn)

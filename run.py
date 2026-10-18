@@ -2,7 +2,7 @@
 Entry point to launch the Streamlit application.
 """
 
-import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -10,4 +10,5 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 if __name__ == "__main__":
-    os.system("streamlit run app/main.py")
+    # Use subprocess instead of os.system for better portability
+    subprocess.run([sys.executable, "-m", "streamlit", "run", "app/main.py"])
